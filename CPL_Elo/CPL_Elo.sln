@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29609.76
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CPL_Elo", "CPL_Elo.csproj", "{5BDDBA35-E386-4FC6-8891-0121248D0CB3}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CPL_Elo_unit_tests", "..\CPL_Elo_unit_tests\CPL_Elo_unit_tests.csproj", "{DC0F145A-6565-401B-B13B-5CD409945E95}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Prerelease|Any CPU = Prerelease|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5BDDBA35-E386-4FC6-8891-0121248D0CB3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5BDDBA35-E386-4FC6-8891-0121248D0CB3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5BDDBA35-E386-4FC6-8891-0121248D0CB3}.Prerelease|Any CPU.ActiveCfg = Prerelease|Any CPU
+		{5BDDBA35-E386-4FC6-8891-0121248D0CB3}.Prerelease|Any CPU.Build.0 = Prerelease|Any CPU
+		{5BDDBA35-E386-4FC6-8891-0121248D0CB3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5BDDBA35-E386-4FC6-8891-0121248D0CB3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DC0F145A-6565-401B-B13B-5CD409945E95}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DC0F145A-6565-401B-B13B-5CD409945E95}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DC0F145A-6565-401B-B13B-5CD409945E95}.Prerelease|Any CPU.ActiveCfg = Debug|Any CPU
+		{DC0F145A-6565-401B-B13B-5CD409945E95}.Prerelease|Any CPU.Build.0 = Debug|Any CPU
+		{DC0F145A-6565-401B-B13B-5CD409945E95}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DC0F145A-6565-401B-B13B-5CD409945E95}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B337ACB2-29BD-4298-B111-E9500303FFA1}
+	EndGlobalSection
+EndGlobal
