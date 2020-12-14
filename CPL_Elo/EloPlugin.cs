@@ -27,11 +27,26 @@ namespace CPL_Elo
 
         public string Author => "me, myself, with copy & paste";
 
-        double k_factor;
+
+        EloConfig config;
 
         public EloPlugin(IConfigurationHandlerFactory configurationHandlerFactory, IDatabaseContextFactory databaseContextFactory, ITranslationLookup translationLookup, IMetaService __metaService) {
             metaService = __metaService;
-            k_factor = configurationHandlerFactory.GetConfigurationHandler<EloConfig>("EloPluginSettings").Configuration().kFactor;
+            config = configurationHandlerFactory.GetConfigurationHandler<EloConfig>("EloPluginSettings").Configuration();
+        }
+
+        public string getPlayerRank(int Elo) {
+            if (Elo >= config.masterRankThreshold)
+                return "menu_div_semipro_64";
+            if (Elo >= config.platinumRankThreshold)
+                return "menu_div_platinum_64";
+            if (Elo >= config.goldRankThreshold)
+                return "menu_div_gold_64";
+            if (Elo >= config.silverRankThreshold)
+                return "menu_div_silver_64";
+            if (Elo >= config.bronzeRankThreshold)
+                return "menu_div_bronze_64";
+            return "menu_div_iron_64";
         }
 
         public async Task<int> GetClientElo(EFClient C) {
@@ -54,7 +69,8 @@ namespace CPL_Elo
                 if (S.Clients[i] == null) {
                     continue;
                 }
-                EloDvar += (i > 0 ? "-" : "") + $"{S.Clients[i].NetworkId},{await GetClientElo(S.Clients[i])}";
+                int clientElo = await GetClientElo(S.Clients[i]);
+                EloDvar += (i > 0 ? "-" : "") + $"{S.Clients[i].NetworkId},{clientElo},{getPlayerRank(clientElo)}";
             }
             Console.WriteLine("EloDvar: " + EloDvar);
             await S.RconParser.SetDvarAsync(S.RemoteConnection, "clients_Elo", EloDvar);
@@ -65,7 +81,7 @@ namespace CPL_Elo
         }
 
         public int CalculateEloChange(List<int> winners, List<int> losers) {
-            return (int)Math.Round(k_factor * (1.0 - GetWinProbability(winners.Sum() / 4, losers.Sum() / 4)));
+            return (int)Math.Round(config.kFactor * (1.0 - GetWinProbability(winners.Sum() / 4, losers.Sum() / 4)));
         }
 
         private async Task ApplyEloChange(Server server, EFClient client, int client_elo, int Elo_change) {
@@ -76,13 +92,13 @@ namespace CPL_Elo
             return server.GetClientsAsList().Find(c => c.NetworkId == player_id);
         }
 
-        public async Task OnEvent(GameEvent E, Server S) {
+        public async Task OnEventAsync(GameEvent E, Server S) {
             switch (E.Type) {
-                case (GameEvent.EventType.PreConnect):
-                case (GameEvent.EventType.Join):
                 case (GameEvent.EventType.MapChange):
+                case (GameEvent.EventType.Join):
+                case (GameEvent.EventType.PreConnect):
                 case (GameEvent.EventType.Disconnect):
-                    _ = SetEloDvars(S);
+                    await SetEloDvars(S);
                     break;
                 case (GameEvent.EventType.Unknown):
                     Console.WriteLine("recieved: " + E.Data);
@@ -125,7 +141,7 @@ namespace CPL_Elo
                             int loser_Elo = losers_elo[i];
                             await ApplyEloChange(S, loser, loser_Elo, -1 * Elo_change);
                         }
-                        _ = SetEloDvars(S);
+                        await SetEloDvars(S);
                     }
                     break;
                 case (GameEvent.EventType.MapEnd):
@@ -133,21 +149,13 @@ namespace CPL_Elo
             }
         }
 
-        public Task OnEventAsync(GameEvent E, Server S) {
-            _ = OnEvent(E, S);
-            return Task.CompletedTask;
-        }
-
-        public async Task OnLoadAsync(IManager manager) {
+        public Task OnLoadAsync(IManager manager) {
             Console.WriteLine($"Elo loaded ({Author})");
-        }
-
-        public Task OnTickAsync(Server S) {
-            throw new NotImplementedException();
-        }
-
-        public Task OnUnloadAsync() {
             return Task.CompletedTask;
         }
+
+        public Task OnTickAsync(Server S) => Task.CompletedTask;
+
+        public Task OnUnloadAsync() => Task.CompletedTask;
     }
 }
