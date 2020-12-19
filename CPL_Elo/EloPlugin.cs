@@ -20,19 +20,16 @@ namespace CPL_Elo
     public class EloPlugin : IPlugin
     {
         public string Name => "Elo";
-
         public float Version => (float)Utilities.GetVersionAsDouble();
-
         private readonly IMetaService metaService;
-
         public string Author => "me, myself, with copy & paste";
-
-
         EloConfig config;
+        UserEloAccessor userEloAccessor;
 
         public EloPlugin(IConfigurationHandlerFactory configurationHandlerFactory, IDatabaseContextFactory databaseContextFactory, ITranslationLookup translationLookup, IMetaService __metaService) {
             metaService = __metaService;
             config = configurationHandlerFactory.GetConfigurationHandler<EloConfig>("EloPluginSettings").Configuration();
+            userEloAccessor = new UserEloAccessor(__metaService);
         }
 
         public string getPlayerRank(int Elo) {
@@ -49,99 +46,62 @@ namespace CPL_Elo
             return "menu_div_iron_64";
         }
 
-        public async Task<int> GetClientElo(EFClient C) {
-            EFMeta Elo_meta = await metaService.GetPersistentMeta("Elo", C);
-            if (Elo_meta == null) {
-                await metaService.AddPersistentMeta("Elo", "1000", C);
-                return 1000;
-            }
-            return Convert.ToInt32(Elo_meta.Value);
-        }
-
-        public async Task SetElo(EFClient C, int Elo) {
-            await metaService.AddPersistentMeta("Elo", Elo.ToString(), C);
-        }
-
-        public async Task SetEloDvars(Server S) {
+        public async Task SetEloDvars(Server server) {
             // Sets dvar with information about connected players' Elo
             string EloDvar = "";
-            for (int i = 0; i < S.Clients.Count; i++) {
-                if (S.Clients[i] == null) {
+            for (int i = 0; i < server.Clients.Count; i++) {
+                EFClient client = server.Clients[i];
+                if (client == null) {
                     continue;
                 }
-                int clientElo = await GetClientElo(S.Clients[i]);
-                EloDvar += (i > 0 ? "-" : "") + $"{S.Clients[i].NetworkId},{clientElo},{getPlayerRank(clientElo)}";
+                int clientElo = userEloAccessor.GetClientElo(client);
+                EloDvar += (i > 0 ? "-" : "") + $"{client.NetworkId},{clientElo},{getPlayerRank(clientElo)}";
+                Console.WriteLine($"{client.Name} [{client.NetworkId}]: {clientElo}");
             }
             Console.WriteLine("EloDvar: " + EloDvar);
-            await S.RconParser.SetDvarAsync(S.RemoteConnection, "clients_Elo", EloDvar);
+            await server.RconParser.SetDvarAsync(server.RemoteConnection, "clients_Elo", EloDvar);
         }
 
-        public double GetWinProbability(int EloOfTeamA, int EloOfTeamB) {
-            return 1.0 / (1.0 + Math.Pow(10, (double)(EloOfTeamB - EloOfTeamA) / 400.0));
+        public double GetWinProbability(double EloOfTeamA, double EloOfTeamB) {
+            return 1.0 / (1.0 + Math.Pow(10, (EloOfTeamB - EloOfTeamA) / 400.0));
         }
 
-        public int CalculateEloChange(List<int> winners, List<int> losers) {
-            return (int)Math.Round(config.kFactor * (1.0 - GetWinProbability(winners.Sum() / 4, losers.Sum() / 4)));
-        }
-
-        private async Task ApplyEloChange(Server server, EFClient client, int client_elo, int Elo_change) {
-            await SetElo(client, client_elo + Elo_change);
+        public int CalculateEloChange(Player[] teamA, Player[] teamB, double result) {
+            return (int)Math.Round(config.kFactor * (result - GetWinProbability(teamA.Average(player => player.elo), teamB.Average(player => player.elo))));
         }
 
         private EFClient GetClient(Server server, long player_id) {
             return server.GetClientsAsList().Find(c => c.NetworkId == player_id);
         }
 
-        public async Task OnEventAsync(GameEvent E, Server S) {
-            switch (E.Type) {
+        public async Task OnEventAsync(GameEvent gameEvent, Server server) {
+            switch (gameEvent.Type) {
                 case (GameEvent.EventType.MapChange):
                 case (GameEvent.EventType.Join):
                 case (GameEvent.EventType.PreConnect):
                 case (GameEvent.EventType.Disconnect):
-                    await SetEloDvars(S);
+                    await SetEloDvars(server);
                     break;
                 case (GameEvent.EventType.Unknown):
-                    Console.WriteLine("recieved: " + E.Data);
+                    Console.WriteLine("recieved: " + gameEvent.Data);
                     string prefix = "RankedGameResult:";
-                    if (E.Data.StartsWith(prefix)) {
-                        string results = E.Data.Substring(prefix.Length);
-                        results = results.Substring(0, results.Length - 1); // removing last semicolon
-                        string[] player_list = results.Split(";");
-                        foreach (string player in player_list) {
-                            Console.WriteLine("player: " + player);
-                        }
-                        int player_count = player_list.Length;
-                        if (player_count % 2 == 1) {
-                            Console.WriteLine("odd number of players");
-                            break;
-                        }
-                        int team_size = player_count / 2;
+                    if (gameEvent.Data.StartsWith(prefix)) {
+                        string results = gameEvent.Data.Substring(prefix.Length);
 
-                        List<EFClient> winners = new List<EFClient>();
-                        List<int> winners_Elo = new List<int>();
-                        List<EFClient> losers = new List<EFClient>();
-                        List<int> losers_elo = new List<int>();
-                        for (int i = 0; i < team_size; i++) {
-                            long winning_player_id = Int64.Parse(player_list[i]);
-                            EFClient winner = GetClient(S, winning_player_id);
-                            winners.Add(winner);
-                            winners_Elo.Add(await GetClientElo(winner));
-                            long losing_player_id = Int64.Parse(player_list[i + team_size]);
-                            EFClient loser = GetClient(S, losing_player_id);
-                            losers.Add(loser);
-                            losers_elo.Add(await GetClientElo(loser));
+                        Lobby lobby = Lobby.create(new EFClientFactory(server), userEloAccessor, results);
+
+                        int axisEloChange = CalculateEloChange(lobby.axis.players, lobby.allies.players, lobby.axis.result);
+                        int alliesEloChange = -axisEloChange;
+
+                        foreach (Player player in lobby.axis.players) {
+                            player.elo = player.elo + axisEloChange;
                         }
 
-                        int Elo_change = CalculateEloChange(winners_Elo, losers_elo);
-                        for (int i = 0; i < team_size; i++) {
-                            EFClient winner = winners[i];
-                            int winner_Elo = winners_Elo[i];
-                            await ApplyEloChange(S, winner, winner_Elo, Elo_change);
-                            EFClient loser = losers[i];
-                            int loser_Elo = losers_elo[i];
-                            await ApplyEloChange(S, loser, loser_Elo, -1 * Elo_change);
+                        foreach (Player player in lobby.allies.players) {
+                            player.elo = player.elo + alliesEloChange;
                         }
-                        await SetEloDvars(S);
+
+                        await SetEloDvars(server);
                     }
                     break;
                 case (GameEvent.EventType.MapEnd):
@@ -154,7 +114,7 @@ namespace CPL_Elo
             return Task.CompletedTask;
         }
 
-        public Task OnTickAsync(Server S) => Task.CompletedTask;
+        public Task OnTickAsync(Server server) => Task.CompletedTask;
 
         public Task OnUnloadAsync() => Task.CompletedTask;
     }

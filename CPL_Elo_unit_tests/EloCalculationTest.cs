@@ -58,19 +58,30 @@ namespace CPL_Elo_unit_tests
         [TestMethod]
         public void TestEqualEloChangeCalculation() {
             EloPlugin plugin = getPlugin();
-            List<int> winnersElo = new List<int> { 1000, 1000, 1000, 1000 };
-            List<int> losersElo = new List<int> { 1000, 1000, 1000, 1000 };
-            int Elo_change = plugin.CalculateEloChange(winnersElo, losersElo);
+            Mock<Player> playerA = new Mock<Player>();
+            Mock<Player> playerB = new Mock<Player>();
+            playerA.Setup(player => player.elo).Returns(1000);
+            playerB.Setup(player => player.elo).Returns(1000);
+            Player[] teamA = { playerA.Object };
+            Player[] teamB = { playerB.Object };
+
+            int Elo_change = plugin.CalculateEloChange(teamA, teamB, 1.0);
             Assert.AreEqual(Elo_change, 20);
         }
 
         [TestMethod]
         public void Test100EloAdvantageChangeCalculation() {
             EloPlugin plugin = getPlugin();
-            List<int> winnersElo = new List<int> { 1100, 1100, 1100, 1100 };
-            List<int> losersElo = new List<int> { 1000, 1000, 1000, 1000 };
-            int Elo_change = plugin.CalculateEloChange(winnersElo, losersElo);
-            Assert.AreEqual(Elo_change, 14);
+            Mock<Player> playerA = new Mock<Player>();
+            Mock<Player> playerB = new Mock<Player>();
+            playerA.Setup(player => player.elo).Returns(1100);
+            playerB.Setup(player => player.elo).Returns(1000);
+            Player[] teamA = { playerA.Object };
+            Player[] teamB = { playerB.Object };
+            int EloChange = plugin.CalculateEloChange(teamA, teamB, 1.0);
+            int reverseEloChange = plugin.CalculateEloChange(teamB, teamA, 0.0);
+            Assert.AreEqual(EloChange, 14);
+            Assert.AreEqual(EloChange, -reverseEloChange);
         }
     }
 }
