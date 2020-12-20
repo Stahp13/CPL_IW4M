@@ -80,5 +80,34 @@ namespace CPL_Elo_unit_tests
             Assert.AreEqual(lobby.allies.players[0].kills, 11);
             Assert.AreEqual(lobby.allies.players[0].deaths, 12);
         }
+        
+        [TestMethod]
+        public void liveStringTest() {
+            string p1 = getPlayerString(0, 1, 2, 3, 4, 5, 6, 7);
+            string p2 = getPlayerString(10, 11, 12, 13, 14, 15, 16, 17);
+            string t1Players = $"[{p1}]";
+            string t2Players = $"[{p2}]";
+            string t1 = getTeamString("250", 1.0, t1Players);
+            string t2 = getTeamString("220", 0.0, t2Players);
+            string game = $"{{ \"map\":\"Raid\",\"mode\":\"Hardpoint\",\"axis\":{{ \"score\":\"0\",\"result\":0.0,\"players\":[{{\"userId\":39545,\"kills\":0,\"deaths\":0,\"score\":0,\"captures\":0,\"defends\":0,\"plants\":0,\"defuses\":0}}]}},\"allies\":{{\"score\":\"0\",\"result\":1.0,\"players\":[{{\"userId\":2715,\"kills\":0,\"deaths\":0,\"score\":0,\"captures\":0,\"defends\":0,\"plants\":0,\"defuses\":0}}]}}}}";
+            Console.WriteLine(game);
+            long[] ids = { 0, 10 };
+            Lobby lobby = Lobby.create(clientFactoryMock.Object, userEloAccessorMock.Object, game);
+
+            Assert.AreEqual(lobby.map, "Raid");
+            Assert.AreEqual(lobby.mode, "Hardpoint");
+
+            Assert.AreEqual(lobby.axis.name, "axis");
+            //Assert.AreEqual(lobby.axis.score, "250");
+            Assert.AreEqual(lobby.axis.result, 0.0);
+            Assert.AreEqual(lobby.axis.players.Length, 1);
+            //Assert.AreEqual(lobby.axis.players[0].userId, 0);
+
+            Assert.AreEqual(lobby.allies.name, "allies");
+            //Assert.AreEqual(lobby.allies.score, "220");
+            Assert.AreEqual(lobby.allies.result, 1.0);
+            Assert.AreEqual(lobby.allies.players.Length, 1);
+            //Assert.AreEqual(lobby.allies.players[0].userId, 10);
+        }
     }
 }
