@@ -14,6 +14,7 @@ using System.Text;
 using System.Threading.Tasks.Dataflow;
 using System.Linq;
 using SharedLibraryCore.Database.Models;
+using SharedLibraryCore.Database;
 
 namespace CPL_Elo
 {
@@ -25,11 +26,13 @@ namespace CPL_Elo
         public string Author => "me, myself, with copy & paste";
         EloConfig config;
         UserEloAccessor userEloAccessor;
+        DatabaseContext databaseContext;
 
         public EloPlugin(IConfigurationHandlerFactory configurationHandlerFactory, IDatabaseContextFactory databaseContextFactory, ITranslationLookup translationLookup, IMetaService __metaService) {
             metaService = __metaService;
             config = configurationHandlerFactory.GetConfigurationHandler<EloConfig>("EloPluginSettings").Configuration();
             userEloAccessor = new UserEloAccessor(__metaService);
+            databaseContext = databaseContextFactory.CreateContext();
         }
 
         public string getPlayerRank(int Elo) {
@@ -88,7 +91,7 @@ namespace CPL_Elo
                     if (gameEvent.Data.StartsWith(prefix)) {
                         string results = gameEvent.Data.Substring(prefix.Length);
 
-                        Lobby lobby = Lobby.create(new EFClientFactory(server), userEloAccessor, results);
+                        Lobby lobby = Lobby.create(new EFClientFactory(databaseContext), userEloAccessor, results);
 
                         int axisEloChange = CalculateEloChange(lobby.axis.players, lobby.allies.players, lobby.axis.result);
                         int alliesEloChange = -axisEloChange;

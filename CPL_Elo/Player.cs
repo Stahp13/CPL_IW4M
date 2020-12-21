@@ -33,7 +33,7 @@ namespace CPL_Elo
         }
         public Player(EFClientFactory factory, UserEloAccessor _userEloAccesor, PlayerData playerData) {
             data = playerData;
-            client = factory.getClient(userId);
+            client = factory.getClient(playerData.userId);
             userEloAccessor = _userEloAccesor;
             cachedElo = userEloAccessor.GetClientElo(client);
         }
