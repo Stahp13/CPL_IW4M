@@ -78,37 +78,41 @@ namespace CPL_Elo
         }
 
         public async Task OnEventAsync(GameEvent gameEvent, Server server) {
-            switch (gameEvent.Type) {
-                case (GameEvent.EventType.MapChange):
-                case (GameEvent.EventType.Join):
-                case (GameEvent.EventType.PreConnect):
-                case (GameEvent.EventType.Disconnect):
-                    await SetEloDvars(server);
-                    break;
-                case (GameEvent.EventType.Unknown):
-                    Console.WriteLine("recieved: " + gameEvent.Data);
-                    string prefix = "RankedGameResult:";
-                    if (gameEvent.Data.StartsWith(prefix)) {
-                        string results = gameEvent.Data.Substring(prefix.Length);
-
-                        Lobby lobby = Lobby.create(new EFClientFactory(databaseContext), userEloAccessor, results);
-
-                        int axisEloChange = CalculateEloChange(lobby.axis.players, lobby.allies.players, lobby.axis.result);
-                        int alliesEloChange = -axisEloChange;
-
-                        foreach (Player player in lobby.axis.players) {
-                            player.elo = player.elo + axisEloChange;
-                        }
-
-                        foreach (Player player in lobby.allies.players) {
-                            player.elo = player.elo + alliesEloChange;
-                        }
-
+            try {
+                switch (gameEvent.Type) {
+                    case (GameEvent.EventType.MapChange):
+                    case (GameEvent.EventType.Join):
+                    case (GameEvent.EventType.PreConnect):
+                    case (GameEvent.EventType.Disconnect):
                         await SetEloDvars(server);
-                    }
-                    break;
-                case (GameEvent.EventType.MapEnd):
-                    break;
+                        break;
+                    case (GameEvent.EventType.Unknown):
+                        Console.WriteLine("recieved: " + gameEvent.Data);
+                        string prefix = "RankedGameResult:";
+                        if (gameEvent.Data.StartsWith(prefix)) {
+                            string results = gameEvent.Data.Substring(prefix.Length);
+
+                            Lobby lobby = Lobby.create(new EFClientFactory(databaseContext), userEloAccessor, results);
+
+                            int axisEloChange = CalculateEloChange(lobby.axis.players, lobby.allies.players, lobby.axis.result);
+                            int alliesEloChange = -axisEloChange;
+
+                            foreach (Player player in lobby.axis.players) {
+                                player.elo = player.elo + axisEloChange;
+                            }
+
+                            foreach (Player player in lobby.allies.players) {
+                                player.elo = player.elo + alliesEloChange;
+                            }
+
+                            await SetEloDvars(server);
+                        }
+                        break;
+                    case (GameEvent.EventType.MapEnd):
+                        break;
+                }
+            } catch(Exception e) {
+                Console.WriteLine("Elo plugin unhandled exception: " + e.ToString());
             }
         }
 
