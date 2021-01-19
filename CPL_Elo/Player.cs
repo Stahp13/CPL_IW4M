@@ -5,6 +5,7 @@ using SharedLibraryCore;
 using SharedLibraryCore.Interfaces;
 using SharedLibraryCore.Database.Models;
 using CPL_Elo.json;
+using CPL_Elo.database;
 using System.Threading.Tasks;
 
 namespace CPL_Elo
@@ -12,8 +13,7 @@ namespace CPL_Elo
     public class Player
     {
         private PlayerData data;
-        private UserEloAccessor userEloAccessor;
-        public EFClient client { get; }
+        public EloContext database;
         public long userId { get { return data.userId; } }
         public int kills { get { return data.kills; }}
         public int deaths { get { return data.deaths; } }
@@ -22,20 +22,70 @@ namespace CPL_Elo
         public int defends { get { return data.defends; } }
         public int plants { get { return data.plants; } }
         public int defuses { get { return data.defuses; } }
-        private int cachedElo;
+        
+        private User getUser() {
+            var ret = database.Users.Find(userId);
+            if (ret == null) {
+                throw new Exception($"user: [{userId}] not found in database!");
+            }
+            return ret;
+        }
+
         virtual public int elo { 
-            get { return cachedElo; } 
+            get { return getUser().elo; } 
             set {
-                Console.WriteLine($"{client.Name} [{client.NetworkId}]: setting Elo: {cachedElo} => {value}");
-                cachedElo = value;
-                userEloAccessor.SetElo(client, value);
+                User u = getUser();
+                u.elo = value;
+                database.Update(u);
             } 
         }
-        public Player(EFClientFactory factory, UserEloAccessor _userEloAccesor, PlayerData playerData) {
+
+        virtual public int wins {
+            get { return getUser().wins; }
+            set {
+                User u = getUser();
+                u.wins = value;
+                database.Update(u);
+            }
+        }
+
+        virtual public int losses {
+            get { return getUser().losses; }
+            set {
+                User u = getUser();
+                u.losses = value;
+                database.Update(u);
+            }
+        }
+
+        virtual public int draws {
+            get { return getUser().draws; }
+            set {
+                User u = getUser();
+                u.draws = value;
+                database.Update(u);
+            }
+        }
+
+        public void setAvailable() {
+            User u = getUser();
+            u.available = true;
+            database.Update(u);
+        }
+
+        public void addResult(double result) {
+            if(result < 0.1) {
+                losses = losses + 1;
+            } else if (result < 0.6) {
+                draws = draws + 1;
+            } else {
+                wins = wins + 1;
+            }
+        }
+
+        public Player(EloContext database, PlayerData playerData) {
             data = playerData;
-            client = factory.getClient(playerData.userId);
-            userEloAccessor = _userEloAccesor;
-            cachedElo = userEloAccessor.GetClientElo(client);
+            this.database = database;
         }
 
         public Player() { }

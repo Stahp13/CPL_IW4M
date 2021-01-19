@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using CPL_Elo;
+using CPL_Elo.database;
 using SharedLibraryCore.Interfaces;
 using Moq;
 using System.Collections.Generic;
@@ -14,19 +15,13 @@ namespace CPL_Elo_unit_tests
     public class LobbyDeserializationTest
     {
         private Mock<Server> serverMock;
-        private Mock<EFClientFactory> clientFactoryMock;
         private List<EFClient> clientList;
-        private Mock<UserEloAccessor> userEloAccessorMock;
+        private Mock<EloContext> userEloAccessorMock;
 
         public LobbyDeserializationTest() {
-            clientFactoryMock = new Mock<EFClientFactory>();
             clientList = new List<EFClient>();
             serverMock = new Mock<Server>();
-            userEloAccessorMock = new Mock<UserEloAccessor>();
-            userEloAccessorMock.Setup(handler => handler.GetClientElo(It.IsAny<EFClient>())).Returns(1000);
-
-            clientFactoryMock.Setup(handler => handler.getClient(It.IsAny<long>())).Returns(new EFClient());
-
+            userEloAccessorMock = new Mock<EloContext>();
         }
 
         private EFClient createClient(long clientID) {
@@ -59,7 +54,7 @@ namespace CPL_Elo_unit_tests
             string game = getGameString("Raid", "Hardpoint", t1, t2);
             Console.WriteLine(game);
             long[] ids = { 0, 10 };
-            Lobby lobby = Lobby.create(clientFactoryMock.Object, userEloAccessorMock.Object, game);
+            Lobby lobby = Lobby.create(userEloAccessorMock.Object, game);
 
             Assert.AreEqual(lobby.map, "Raid");
             Assert.AreEqual(lobby.mode, "Hardpoint");
@@ -92,7 +87,7 @@ namespace CPL_Elo_unit_tests
             string game = $"{{ \"map\":\"Raid\",\"mode\":\"Hardpoint\",\"axis\":{{ \"score\":\"0\",\"result\":0.0,\"players\":[{{\"userId\":39545,\"kills\":0,\"deaths\":0,\"score\":0,\"captures\":0,\"defends\":0,\"plants\":0,\"defuses\":0}}]}},\"allies\":{{\"score\":\"0\",\"result\":1.0,\"players\":[{{\"userId\":2715,\"kills\":0,\"deaths\":0,\"score\":0,\"captures\":0,\"defends\":0,\"plants\":0,\"defuses\":0}}]}}}}";
             Console.WriteLine(game);
             long[] ids = { 0, 10 };
-            Lobby lobby = Lobby.create(clientFactoryMock.Object, userEloAccessorMock.Object, game);
+            Lobby lobby = Lobby.create(userEloAccessorMock.Object, game);
 
             Assert.AreEqual(lobby.map, "Raid");
             Assert.AreEqual(lobby.mode, "Hardpoint");

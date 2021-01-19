@@ -42,7 +42,7 @@ namespace CPL_Elo_unit_tests
             EloPlugin plugin = getPlugin();
             int averageWinnersElo = 1100;
             int averageLosersElo = 1100;
-            double win_probability = plugin.GetWinProbability(averageWinnersElo, averageLosersElo);
+            double win_probability = plugin.ratingSystem.GetWinProbability(averageWinnersElo, averageLosersElo);
             Assert.AreEqual(win_probability, 0.5);
         }
 
@@ -51,7 +51,8 @@ namespace CPL_Elo_unit_tests
             EloPlugin plugin = getPlugin();
             int averageWinnersElo = 1100;
             int averageLosersElo = 1000;
-            double win_probability = plugin.GetWinProbability(averageWinnersElo, averageLosersElo);
+            double win_probability = plugin.ratingSystem.GetWinProbability(averageWinnersElo, averageLosersElo);
+            Console.WriteLine(win_probability);
             Assert.IsTrue(isNear(win_probability, 0.64));
         }
 
@@ -65,7 +66,7 @@ namespace CPL_Elo_unit_tests
             Player[] teamA = { playerA.Object };
             Player[] teamB = { playerB.Object };
 
-            int Elo_change = plugin.CalculateEloChange(teamA, teamB, 1.0);
+            int Elo_change = plugin.ratingSystem.CalculateEloChange(teamA.Select(p => p.elo), teamB.Select(p => p.elo), 1.0);
             Assert.AreEqual(Elo_change, 20);
         }
 
@@ -78,9 +79,9 @@ namespace CPL_Elo_unit_tests
             playerB.Setup(player => player.elo).Returns(1000);
             Player[] teamA = { playerA.Object };
             Player[] teamB = { playerB.Object };
-            int EloChange = plugin.CalculateEloChange(teamA, teamB, 1.0);
-            int reverseEloChange = plugin.CalculateEloChange(teamB, teamA, 0.0);
-            Assert.AreEqual(EloChange, 14);
+            int EloChange = plugin.ratingSystem.CalculateEloChange(teamA.Select(p => p.elo), teamB.Select(p => p.elo), 1.0);
+            int reverseEloChange = plugin.ratingSystem.CalculateEloChange(teamB.Select(p => p.elo), teamA.Select(p => p.elo), 0.0);
+            Assert.AreEqual(14, EloChange);
             Assert.AreEqual(EloChange, -reverseEloChange);
         }
     }

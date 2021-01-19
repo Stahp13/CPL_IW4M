@@ -15,99 +15,83 @@ using System.Threading.Tasks.Dataflow;
 using System.Linq;
 using SharedLibraryCore.Database.Models;
 using SharedLibraryCore.Database;
+using CPL_Elo.database;
+using PlayerRatingSystems;
 
 namespace CPL_Elo
 {
     public class EloPlugin : IPlugin
     {
+        public class Prefix
+        {
+            public static string RankGameEnded = "RankedGameResult:";
+            public static string RankGameAborted = "RankedGameAborted:";
+        }
+
         public string Name => "Elo";
         public float Version => (float)Utilities.GetVersionAsDouble();
-        private readonly IMetaService metaService;
         public string Author => "me, myself, with copy & paste";
-        EloConfig config;
-        UserEloAccessor userEloAccessor;
-        DatabaseContext databaseContext;
+        public PlayerRatingSystem ratingSystem;
+        
 
         public EloPlugin(IConfigurationHandlerFactory configurationHandlerFactory, IDatabaseContextFactory databaseContextFactory, ITranslationLookup translationLookup, IMetaService __metaService) {
-            metaService = __metaService;
-            config = configurationHandlerFactory.GetConfigurationHandler<EloConfig>("EloPluginSettings").Configuration();
-            userEloAccessor = new UserEloAccessor(__metaService);
-            databaseContext = databaseContextFactory.CreateContext();
+            EloConfig config = configurationHandlerFactory.GetConfigurationHandler<EloConfig>("EloPluginSettings").Configuration();
+            ratingSystem = new EloRatingSystem(config.kFactor);
         }
 
-        public string getPlayerRank(int Elo) {
-            if (Elo >= config.masterRankThreshold)
-                return "menu_div_semipro_64";
-            if (Elo >= config.platinumRankThreshold)
-                return "menu_div_platinum_64";
-            if (Elo >= config.goldRankThreshold)
-                return "menu_div_gold_64";
-            if (Elo >= config.silverRankThreshold)
-                return "menu_div_silver_64";
-            if (Elo >= config.bronzeRankThreshold)
-                return "menu_div_bronze_64";
-            return "menu_div_iron_64";
-        }
+        public void OnRankedGameEnded(GameEvent gameEvent) {
+            EloContext eloContext = new EloContext();
+            eloContext.Database.EnsureCreated();
+            string results = gameEvent.Data.Substring(Prefix.RankGameEnded.Length);
 
-        public async Task SetEloDvars(Server server) {
-            // Sets dvar with information about connected players' Elo
-            string EloDvar = "";
-            for (int i = 0; i < server.Clients.Count; i++) {
-                EFClient client = server.Clients[i];
-                if (client == null) {
-                    continue;
-                }
-                int clientElo = userEloAccessor.GetClientElo(client);
-                EloDvar += (i > 0 ? "-" : "") + $"{client.NetworkId},{clientElo},{getPlayerRank(clientElo)}";
-                Console.WriteLine($"{client.Name} [{client.NetworkId}]: {clientElo}");
+            Lobby lobby = Lobby.create(eloContext, results);
+
+            int axisEloChange = ratingSystem.CalculateEloChange(lobby.axis.players.Select(p => p.elo), lobby.allies.players.Select(p => p.elo), lobby.axis.result);
+            int alliesEloChange = -axisEloChange;
+
+            foreach (Player player in lobby.axis.players) {
+                player.elo = player.elo + axisEloChange;
+                player.addResult(lobby.axis.result);
+                player.setAvailable();
             }
-            Console.WriteLine("EloDvar: " + EloDvar);
-            await server.RconParser.SetDvarAsync(server.RemoteConnection, "clients_Elo", EloDvar);
+
+            foreach (Player player in lobby.allies.players) {
+                player.elo = player.elo + alliesEloChange;
+                player.addResult(lobby.allies.result);
+                player.setAvailable();
+            }
+            eloContext.SaveChanges();
         }
 
-        public double GetWinProbability(double EloOfTeamA, double EloOfTeamB) {
-            return 1.0 / (1.0 + Math.Pow(10, (EloOfTeamB - EloOfTeamA) / 400.0));
-        }
-
-        public int CalculateEloChange(Player[] teamA, Player[] teamB, double result) {
-            return (int)Math.Round(config.kFactor * (result - GetWinProbability(teamA.Average(player => player.elo), teamB.Average(player => player.elo))));
-        }
-
-        private EFClient GetClient(Server server, long player_id) {
-            return server.GetClientsAsList().Find(c => c.NetworkId == player_id);
+        public void OnRankedGameAborted(GameEvent gameEvent) {
+            EloContext eloContext = new EloContext();
+            string[] playerIds = gameEvent.Data.Substring(Prefix.RankGameAborted.Length).Split(";"); ;
+            foreach (string playerId in playerIds) {
+                User user = eloContext.Users.Find(Convert.ToInt64(playerId));
+                if (user == null) {
+                    throw new Exception($"user: [{playerId}] not found in database!");
+                }
+                user.available = true;
+                eloContext.Update(user);
+            }
+            eloContext.SaveChanges();
         }
 
         public async Task OnEventAsync(GameEvent gameEvent, Server server) {
             try {
                 switch (gameEvent.Type) {
+                    case (GameEvent.EventType.Unknown):
+                        Console.WriteLine("recieved: " + gameEvent.Data);
+                        if (gameEvent.Data.StartsWith(Prefix.RankGameEnded)) {
+                            OnRankedGameEnded(gameEvent);
+                        } else if (gameEvent.Data.StartsWith(Prefix.RankGameAborted)) {
+                            OnRankedGameAborted(gameEvent);
+                        }
+                        break;
                     case (GameEvent.EventType.MapChange):
                     case (GameEvent.EventType.Join):
                     case (GameEvent.EventType.PreConnect):
                     case (GameEvent.EventType.Disconnect):
-                        await SetEloDvars(server);
-                        break;
-                    case (GameEvent.EventType.Unknown):
-                        Console.WriteLine("recieved: " + gameEvent.Data);
-                        string prefix = "RankedGameResult:";
-                        if (gameEvent.Data.StartsWith(prefix)) {
-                            string results = gameEvent.Data.Substring(prefix.Length);
-
-                            Lobby lobby = Lobby.create(new EFClientFactory(databaseContext), userEloAccessor, results);
-
-                            int axisEloChange = CalculateEloChange(lobby.axis.players, lobby.allies.players, lobby.axis.result);
-                            int alliesEloChange = -axisEloChange;
-
-                            foreach (Player player in lobby.axis.players) {
-                                player.elo = player.elo + axisEloChange;
-                            }
-
-                            foreach (Player player in lobby.allies.players) {
-                                player.elo = player.elo + alliesEloChange;
-                            }
-
-                            await SetEloDvars(server);
-                        }
-                        break;
                     case (GameEvent.EventType.MapEnd):
                         break;
                 }

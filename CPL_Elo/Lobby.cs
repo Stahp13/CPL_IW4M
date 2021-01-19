@@ -5,6 +5,7 @@ using CPL_Elo.json;
 using SharedLibraryCore;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CPL_Elo.database;
 
 namespace CPL_Elo
 {
@@ -14,15 +15,15 @@ namespace CPL_Elo
         public string mode { get; }
         public Team axis { get; }
         public Team allies { get; }
-        public Lobby(EFClientFactory factory, UserEloAccessor userEloAccesor, GameData gameData) {
-            axis = new Team(factory, userEloAccesor, gameData.axis, "axis");
-            allies = new Team(factory, userEloAccesor, gameData.allies, "allies");
+        public Lobby(EloContext eloContext, GameData gameData) {
+            axis = new Team(eloContext, gameData.axis, "axis");
+            allies = new Team(eloContext, gameData.allies, "allies");
             map = gameData.map;
             mode = gameData.mode;
         }
 
-        public static Lobby create(EFClientFactory factory, UserEloAccessor userEloAccesor, string jsonText) {
-            return new Lobby(factory, userEloAccesor, JsonSerializer.Deserialize<GameData>(jsonText));
+        public static Lobby create(EloContext eloContext, string jsonText) {
+            return new Lobby(eloContext, JsonSerializer.Deserialize<GameData>(jsonText));
         }
     }
 }
